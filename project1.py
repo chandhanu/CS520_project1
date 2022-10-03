@@ -7,7 +7,8 @@ PROBABLITY_BLOCKED = 0.28
 PROBABLITY_UNBLOCKED = 1-PROBABLITY_BLOCKED
 
 MAZE = None
-
+BLOCKED_CELLS = []
+FREE_CELLS = []
 LEFT = (-1, 0)
 RIGHT = (1,0)
 UP = (0,1)
@@ -19,13 +20,9 @@ class Components(str, Enum):
     BLOCK = "#"
     PATH = "1"
     EMPTY = "."
+    GHOST = "X"
 
 static_i = 0
-
-'''class Index():
-    def __init__(self, i, j):
-        self.row = i
-        self.col = j'''
 
 Index = namedtuple('Index', ['row', 'col'])
 
@@ -34,13 +31,14 @@ class Node:
         pass
 
 class Maze:
-    def __init__(self, rows, cols, probablity_blocked):
+    def __init__(self, rows, cols, probablity_blocked, ghost_count):
         self.rows = rows
         self.cols = cols
         self.P = probablity_blocked
         self.start = Index(0,0)
         self.goal = Index(rows-1,cols-1)
         self.grid = [[Components.EMPTY for c in range(cols)] for r in range(rows)]
+        self.ghost_count = ghost_count
     
     
     def display(self):
@@ -58,6 +56,9 @@ class Maze:
             for col in range(self.cols):
                 if random.uniform(0, 1.0) < self.P:
                     self.grid[row][col] = Components.BLOCK
+                    '''BLOCKED_CELLS.append((row,col))
+                else:
+                    FREE_CELLS.append((row,col))'''
     
     def get_children(self, x):
         coordinates=[]
@@ -79,6 +80,24 @@ class Maze:
             curr = stack.pop()
             #print(curr, self.goal)
             if curr == self.goal:
+                return curr
+            for child in self.get_children(curr):
+                #print("curr:", curr, "children:", child.row, child.col)
+                if child in visited:
+                    continue
+                visited.add(child)
+                #self.grid[child.row][child.col] = "*"
+                stack.append(child)
+        return None 
+    def dfs_revamp(self, start, destination):
+
+        stack = deque()
+        stack.append(start)
+        visited = set([start])
+        while stack:
+            curr = stack.pop()
+            #print(curr, self.goal)
+            if curr == destination:
                 return curr
             for child in self.get_children(curr):
                 #print("curr:", curr, "children:", child.row, child.col)
@@ -131,7 +150,17 @@ class Maze:
         return False
     
     def is_valid_maze(self):
-        return self.dfs()
+        return self.dfs_revamp(self.start, self.goal)
+
+    def learn_structure(self):
+        free, blocked = [], []
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.grid[row][col] == Components.BLOCK.value:
+                    blocked.append((row,col))
+                if self.grid[row][col] == Components.EMPTY.value:
+                    free.append((row,col))
+        return free, blocked 
                     
     def initiate(self):
         #maze = self.generate_maze()
@@ -152,14 +181,30 @@ class Maze:
             MAZE = self
         return
 
-
+    def populate_ghost(self):
+        ghost_i = 0
+        while (ghost_i<self.ghost_count):
+            a = random.choice(FREE_CELLS)
+            i, j = a
+            if not (self.grid[i][j] == Components.GHOST.value or self.grid[i][j] == Components.BLOCK.value):
+                if self.dfs_revamp(Index(i, j), self.start)!=None:
+                    self.grid[i][j] = Components.GHOST.value
+                    ghost_i+=1
 
 if __name__ == "__main__":
     #print(Components.BLOCK.value)
-    maze = Maze(rows=10, cols=10, probablity_blocked=PROBABLITY_BLOCKED)
+    maze = Maze(rows=20, cols=20, probablity_blocked=PROBABLITY_BLOCKED, ghost_count=50)
     maze.initiate()
     #maze.display()
     # ACTUAL --- 
     print("FINAL MAZE")
+    print(BLOCKED_CELLS)
+    FREE_CELLS, BLOCKED_CELLS =  MAZE.learn_structure()
+    print("START", MAZE.start)
+    print("GOAL", MAZE.goal)
+    MAZE.populate_ghost()
+    
     MAZE.display()    
+    #print(FREE_CELLS)
+    #print(BLOCKED_CELLS)
     #print(maze)
