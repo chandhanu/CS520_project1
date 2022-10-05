@@ -1,3 +1,4 @@
+from turtle import update
 import numpy as np 
 from enum import Enum
 import random
@@ -81,29 +82,29 @@ class Maze:
         coordinates=[]
         if (x.row + 1 < self.rows) and (self.grid[x.row + 1][x.col] != Components.BLOCK) and (self.grid[x.row + 1][x.col] != Components.GHOST):
             coordinates.append(Index(x.row + 1, x.col))
-        if (x.row - 1 >= 0) and (self.grid[x.row - 1][x.col] != Components.BLOCK) and (self.grid[x.row - 1][x.col] != Components.GHOST):
-            coordinates.append(Index(x.row - 1, x.col))
         if (x.col + 1 < self.cols) and (self.grid[x.row][x.col + 1] != Components.BLOCK) and (self.grid[x.row][x.col + 1] != Components.GHOST):
             coordinates.append(Index(x.row, x.col + 1))
+        if (x.row - 1 >= 0) and (self.grid[x.row - 1][x.col] != Components.BLOCK) and (self.grid[x.row - 1][x.col] != Components.GHOST):
+            coordinates.append(Index(x.row - 1, x.col))
         if (x.col - 1 >= 0) and (self.grid[x.row][x.col - 1] != Components.BLOCK) and (self.grid[x.row][x.col - 1] != Components.GHOST):
             coordinates.append(Index(x.row, x.col - 1))
         return coordinates
     
-    def get_ghost_children(self, x):
-        coordinates=[]
+    def get_ghost_child(self, x):
+        coordinates=[]        
         if (x.row + 1 < self.rows) and (self.grid[x.row + 1][x.col] != Components.GHOST):
             if self.grid[x.row + 1][x.col] == Components.BLOCK:
                 if random.uniform(0, 1.0) < PROBABLITY_GHOST_ENTERING_BLOCK:
                     coordinates.append(Index(x.row + 1, x.col))
             else:
                 coordinates.append(Index(x.row + 1, x.col))
-        if (x.row - 1 >= 0) and (self.grid[x.row - 1][x.col] != Components.GHOST):
+        if  (x.row - 1 >= 0) and (self.grid[x.row - 1][x.col] != Components.GHOST):
             if self.grid[x.row - 1][x.col] == Components.BLOCK:
                 if random.uniform(0, 1.0) < PROBABLITY_GHOST_ENTERING_BLOCK:
                     coordinates.append(Index(x.row - 1, x.col))
             else:
                 coordinates.append(Index(x.row - 1, x.col))
-        if (x.col + 1 < self.cols) and (self.grid[x.row][x.col + 1] != Components.GHOST):
+        if  (x.col + 1 < self.cols) and (self.grid[x.row][x.col + 1] != Components.GHOST):
             if self.grid[x.row][x.col + 1] == Components.BLOCK:
                 if random.uniform(0, 1.0) < PROBABLITY_GHOST_ENTERING_BLOCK:
                     coordinates.append(Index(x.row, x.col + 1))
@@ -115,6 +116,11 @@ class Maze:
                     coordinates.append(Index(x.row, x.col - 1))
             else:    
                 coordinates.append(Index(x.row, x.col - 1))
+        if len(coordinates) == 1:
+            return coordinates[0]
+        else:
+            if len(coordinates)>0:
+                return coordinates[random.randrange(len(coordinates))]
         return coordinates
 
     def mark(self, path):
@@ -232,43 +238,143 @@ class Maze:
             if not (self.grid[i][j] == Components.GHOST.value or self.grid[i][j] == Components.BLOCK.value):
                 if self.dfs(Index(i, j), self.start)!=None:
                     self.grid[i][j] = Components.GHOST.value
-                    self.ghost_indexes[Index(i,j)] = {"replaced_value": Components.EMPTY, }
+                    self.ghost_indexes[Index(i,j)] = {"replaced_value": Components.EMPTY }
                     ghost_i+=1
     
-    def advance_ghost(self):
-        for g_i, g_v in self.ghost_indexes.items():
-            print(g_i, type(g_i))
+    def advance_ghosts(self):
+        #print("Advance ghosts")
+        ghost_index_list = self.ghost_indexes.keys()
+        #print("Ghost indexez-----")
+        #print(ghost_index_list)
+        #print("------------------")
+        delete_ghost_indexes = []
+        create_ghost_indexes = {}
+        #self.display()
+        for g_i in ghost_index_list:
+            g_v = self.ghost_indexes[g_i]
+            ghost_child = self.get_ghost_child(g_i)
+            #print("parent:",g_i, "child:",ghost_child)
+            #print("Ghost_indexes", g_i, )
+            self.grid[g_i.row][g_i.col] = g_v["replaced_value"]
+            #self.ghost_indexes[]
+            create_ghost_indexes[ghost_child] = {"replaced_value": self.grid[ghost_child.row][ghost_child.col]}
+            self.grid[ghost_child.row][ghost_child.col] = Components.GHOST
+            delete_ghost_indexes.append(g_i)
+        for k,v in create_ghost_indexes.items():
+            self.ghost_indexes[k] = v 
+        for g_i in delete_ghost_indexes:
+            del self.ghost_indexes[g_i]
+        '''for k,v in self.ghost_indexes.items():
+            print("GHOST i :", k, "Old value :", v)'''
 
-
-    def run_agent1(self):
+    def shortest_path(self):
         is_path = self.bfs(self.start, self.goal)
         if is_path == None:
-            print("Agent1 martyred")
+            print("Path is blocked")
         else: 
             path = node_to_path(is_path)
             self.mark(path)
             #print(len(path), path)
             self.display()
             self.clear(path)
-            print("Agent 00 7 survived")
+            print("Path exists")
+            return path
+    
+    def get_next_position(self, x):
+        next = self.get_children(x)
+        if len(next) :
+            return next[0]
+        else:
+            return None
+
+    
+    def agent2(self):
+        path = []
+        curr = self.start
+        #while not (curr in self.ghost_indexes) and curr!=self.goal:
+        while self.grid[curr.row][curr.col] != Components.GHOST and curr!=self.goal:
+            self.display()
+            if self.bfs(curr, self.goal)!=None:
+                next_position = self.get_next_position(curr)
+                if next_position == None:
+                    print("Agent is dead at 1 : ", next_position)
+                    print(self.ghost_indexes)
+                    return None
+                path.append(next_position)
+                self.advance_ghosts()
+                ################
+                if next_position in self.ghost_indexes:
+                    print("Agent is dead at 2 : ", next_position)
+                    print(self.ghost_indexes)
+                    return None
+                self.grid[next_position.row][next_position.col] = "A"
+                ################
+                if next_position == self.goal:
+                    return path
+                curr = next_position
+            else:
+                print("CURR", curr, next_position, self.ghost_indexes)
+                return None
+        if next_position == None:
+            print("Agent is dead at : ", next_position)
+            print(self.ghost_indexes)
+            return None
+        
+    
+    def agent1(self):
+        path = []
+        curr = self.start
+        shortest_path = MAZE.shortest_path()
+        if shortest_path:
+            for node in shortest_path:
+                self.display()
+                self.grid[node.row][node.col] = "A"
+                if node in self.ghost_indexes:
+                    print("Agent 1 died at ", node)
+                    return None 
+                else:
+                    self.advance_ghosts()
+            else:
+                return shortest_path
+        return None
+            
+    
+
+    
 
 if __name__ == "__main__":
-    maze = Maze(rows=10, cols=10, probablity_blocked=PROBABLITY_BLOCKED, ghost_count=5)
+    maze = Maze(rows=4, cols=4, probablity_blocked=PROBABLITY_BLOCKED, ghost_count=2)
     # 1. Initiate MAZE 
     maze.initiate()
     FREE_CELLS, BLOCKED_CELLS =  MAZE.learn_structure()
     #print("START", MAZE.start)
     #print("GOAL", MAZE.goal)
-    print(MAZE.start.row, "---------")
+    #print(MAZE.start.row, "---------")
     # 2. Populate Ghost 
     MAZE.populate_ghost()
     
     # 3. Display Maze 
     MAZE.display()    
 
-    # 4. Agent 1 
-    MAZE.run_agent1()
-    print(MAZE.ghost_indexes)
+    # 4. AGENT 1
+    path = MAZE.agent1()
+    if path:
+        print(path)
+    else:
+        print("Agent 1 Martyred")
+    wait = input()
+    #print(MAZE.ghost_indexes)
+    path = MAZE.agent2()
+    print(path)
+    MAZE.display()
+    '''for i in range(10):
+        print(i)
+        MAZE.advance_ghosts()
+        time.sleep(0.5)'''
+    exit(-1)
+        
+
+    #print(MAZE.agent1())
     
 
 
