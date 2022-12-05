@@ -1,5 +1,3 @@
-from platform import node
-from turtle import update
 import numpy as np 
 from enum import Enum
 import random
@@ -30,11 +28,14 @@ DOWN = (-1,0)
 
 agent2_path = []
 agent3_path = []
+agent4_path = []
+agent5_path = []
 agent2_simulation_number = 10
 
 static_i = 0
 count_advance_ghost = 5
 
+#All matrix elements are represented as Index variables 
 Index = namedtuple('Index', ['row', 'col'])
 
 class Components(str, Enum):
@@ -106,12 +107,11 @@ class Maze:
         self.ghost_indexes = {}
         self.ghost_entering_block_probablity = 0.5
         self.free_cells = self.blocked_cells = 0
-    
-    
+     
     def display(self, m="MAZE"):
+        #Displays Maze
         print("---"+m+"---")
         c=0
-        
         for i in self.grid:
             print(" ".join(i))
             c+=1
@@ -141,19 +141,7 @@ class Maze:
         if (x.col - 1 >= 0) and (self.grid[x.row][x.col - 1] != Components.BLOCK) and (self.grid[x.row][x.col - 1] != Components.GHOST):
             coordinates.append(Index(x.row, x.col - 1))
         return coordinates
-    
-    def get_children_revamp(self, x):
-        coordinates=[]
-        if (x.row + 1 < self.rows) and (self.grid[x.row + 1][x.col] != Components.BLOCK) and (self.grid[x.row + 1][x.col] != Components.GHOST):
-            coordinates.append(Index(x.row + 1, x.col))
-        if (x.col + 1 < self.cols) and (self.grid[x.row][x.col + 1] != Components.BLOCK) and (self.grid[x.row][x.col + 1] != Components.GHOST):
-            coordinates.append(Index(x.row, x.col + 1))
-        if (x.row - 1 >= 0) and (self.grid[x.row - 1][x.col] != Components.BLOCK) and (self.grid[x.row - 1][x.col] != Components.GHOST):
-            coordinates.append(Index(x.row - 1, x.col))
-        if (x.col - 1 >= 0) and (self.grid[x.row][x.col - 1] != Components.BLOCK) and (self.grid[x.row][x.col - 1] != Components.GHOST):
-            coordinates.append(Index(x.row, x.col - 1))
-        return coordinates
-    
+        
     def get_adjacent_indices(self, i, j, m,n):
         adjacent_indices = []
         if i > 0:
@@ -335,29 +323,7 @@ class Maze:
                 #time.sleep(0.1)
                 queue.append(Node(child, curr))
         return None 
-    
-    def is_valid_maze_temp(self, start_position=(0,0)):
-        visited = set([start_position])
-        fringe = [start_position]
-        while fringe:
-            i,j = fringe.pop(0)
-            visited.add((i,j))
-            for di,dj in [RIGHT, DOWN, LEFT, UP]:
-                ni,nj = i+di, j+dj
-                if (ni,nj) in visited:
-                    continue
-                if ni<0 or nj<0 or ni>=self.rows or nj>=self.cols:
-                    continue
-                if self.grid[ni][nj] == Components.GOAL.value:
-                    return True
-                if self.grid[ni][nj] == Components.BLOCK.value:
-                    continue
-                if self.grid[ni][nj] == Components.EMPTY.value:
-                    visited.add((ni,nj))
-                    #self.grid[i][j] = "*"
-                    fringe.append((ni,nj))
-        return False
-    
+        
     def is_valid_maze(self):
         return self.dfs(self.start, self.goal)
 
@@ -412,7 +378,6 @@ class Maze:
                 ghost_i+=1
                 self.free_cells.remove((i,j))
                 continue
-
     
     def advance_ghosts(self):
         
@@ -444,17 +409,21 @@ class Maze:
         
     def manhattan_distance(self, goal):
         def distance(ml):
-
             xdist = abs(ml.col - goal.col)
             ydist = abs(ml.row - goal.row)
             return (xdist + ydist)
         return distance
 
+    def dist(self, ml, goal):
+        xdist = abs(ml.col - goal.col)
+        ydist = abs(ml.row - goal.row)
+        return (xdist + ydist)
+
     def astar(self, initial, heuristic):
         # priority_queue is where we've yet to go
         priority_queue = PriorityQueue()
-        n = Node(initial, None, 0.0, heuristic(initial))
-        priority_queue.push(Node(initial, None, 0.0, heuristic(initial)))
+        n = Node(initial, None, 0.0, self.dist(initial, self.goal))
+        priority_queue.push(Node(initial, None, 0.0, self.dist(initial, self.goal)))
         # explored is where we've been
         explored = {initial: 0.0}
 
@@ -470,7 +439,7 @@ class Maze:
                 new_cost: float = current_node.cost + 1  # 1 assumes a grid, need a cost function for more sophisticated apps
                 if child not in explored or explored[child] > new_cost:
                     explored[child] = new_cost
-                    priority_queue.push(Node(child, current_node, new_cost, heuristic(child)))
+                    priority_queue.push(Node(child, current_node, new_cost, self.dist(child, self.goal)))
         return None  # went through everything and never found goal
     
     def get_nearest_ghost(self, curr):
@@ -490,14 +459,14 @@ class Maze:
         else:
             return None
 
-    
     def agent2(self, source):
         curr = source
         global agent2_path
         global static_i 
         count=0
-        while curr!=self.goal and (not (curr in self.ghost_indexes )):
-            path = self.astar(curr, self.manhattan_distance(self.goal))
+        path = self.astar(curr, self.dist(curr, self.goal))
+        #path = self.dfs_agent2(curr, self.goal)
+        if curr!=self.goal and (not (curr in self.ghost_indexes )):
             static_i+=1
             if path:
                 count=0
@@ -519,22 +488,43 @@ class Maze:
                     self.advance_ghosts()
             else:
                 #BLOCKED
-                self.advance_ghosts() 
-                count +=1
-                if count ==5:
-                    return None
+                try:
+                    rows = [1, -1, 0, 0]
+                    cols = [0, 0, 1, -1]
+                    closest_ghost_distance_all_path = float('-infinity')
+                    for i,j in zip(rows, cols):
+                        curr_row = curr.row+i
+                        curr_col = curr.col+j
+                        new_index = Index(curr_row,curr_col)
+                        new_path = self.astar(new_index, self.dist(new_index, self.goal))
+                        if  new_path:
+                            ghost_blocks_in_path = common_member(node_to_path(new_path), self.ghost_indexes.keys())
+                            closest_ghost_distance = float("infinity")
+                            for id, ghost in enumerate(ghost_blocks_in_path):
+                                closest_ghost_distance = min(closest_ghost_distance, self.dist(new_index, ghost))
+                            if closest_ghost_distance >= closest_ghost_distance_all_path:
+                                closest_ghost_distance_all_path = closest_ghost_distance
+                                curr = new_index
+                                path = new_path
+                    #closest_ghost_distance
+                except:
+                    #self.advance_ghosts() 
+                    count +=1
+                    if count ==50:
+                        return None
         if curr in self.ghost_indexes:
             print("Killed at ", curr)
         return None
 
     def agent2_simulation(self, source, return_path, count = 0 ):
+        # Agent 2 with cut short search spaces 
         curr = source
         global agent2_path
         global static_i 
         
         if curr!=self.goal and (not (curr in self.ghost_indexes )):
-            path = self.dfs_agent2(curr, self.goal)
-            #path = self.astar(curr, self.manhattan_distance(self.goal))
+            #path = self.dfs_agent2(curr, self.goal)
+            path = self.astar(curr, self.manhattan_distance(self.goal))
             static_i+=1
             if path:
                 count=0
@@ -554,7 +544,6 @@ class Maze:
                     #self.advance_ghosts() # keeping maze constant 
             else:
                 #BLOCKED
-                #print("ELSEeeeeeeeeeeeeeeeeee")
                 #self.advance_ghosts() # keeping maze constant - Cutting short the search space 
                 count +=1
                 if count ==5:
@@ -563,15 +552,17 @@ class Maze:
             print("Killed at ", curr)
         return None
 
-    def get_survivability(self, children, simulation_number):
+    def get_survivability(self, children, simulation_number, method = "astar"):
         s_index = {} # Survivability_index
         global agent2_path
         agent2_path = []
         #print("------S - Index --------")
         for child in children: 
             for i in range(simulation_number):
-                path = self.astar(child, self.manhattan_distance(self.goal))
-                #path = self.agent2_simulation(child,[])
+                if method == "astar":
+                    path = self.astar(child, self.manhattan_distance(self.goal))
+                else:
+                    path = self.agent2_simulation(child,[])
                 if path :
                     if child in s_index:
                         s_index[child] +=1
@@ -595,7 +586,7 @@ class Maze:
                 l.append(k)
         return random.choice(l)
 
-    def agent3_old(self, start, destination, prev):
+    def agent3_working_but_low_efficiency(self, start, destination, prev):
         curr = start 
         global agent3_path
         global agent2_simulation_number
@@ -703,7 +694,7 @@ class Maze:
                                     temp_list.append(self.goal)
                                     #agent3_path.extend(temp_list)
                                     return temp_list
-                                s_index = self.get_survivability(children, agent2_simulation_number) # Survivability_index 
+                                s_index = self.get_survivability(children, agent2_simulation_number, "agent2_simulated") # Survivability_index 
                                 s_index_max = dict( sorted(s_index.items(), key=operator.itemgetter(1),reverse=True))
                                 
                                 if len(s_index_max):
@@ -727,7 +718,7 @@ class Maze:
                         ###################
                         curr = node
                         #input()
-                        return self.agent4(curr) # agent4 replans 
+                        return self.agent2(curr) # agent3 replans # break the barrier 
                     else:
                         agent3_path.append(node)
                     self.advance_ghosts()
@@ -743,7 +734,82 @@ class Maze:
             print("Killed at ", curr)
         return None
 
-    def agent4(self, start):
+    def agent4(self,start):
+        curr = start
+        global agent3_path
+        global static_i 
+        global count_advance_ghost
+        global agent2_simulation_number
+        count=0
+        if curr!=self.goal and (not (curr in self.ghost_indexes )):
+            #path = self.astar(curr, self.manhattan_distance(self.goal))
+            path = self.astar(curr, self.manhattan_distance(self.goal))
+            
+            static_i+=1
+            if path:
+                count=0
+                route = node_to_path(path)
+                for node in route : 
+                    #print(node, self.goal)
+                    if node == self.goal:
+                        return agent3_path
+                    #finding ghost in path 
+                    ghost_blocks = common_member(route, self.ghost_indexes.keys())
+                    if ghost_blocks:
+                        #print("ghosts blocking at ", ghost_blocks)
+                        ###################
+                        
+                        if curr == self.goal:
+                            temp_list.append(curr)
+                            return temp_list
+                        if curr!=self.goal and (not (curr in self.ghost_indexes )):
+                            children = self.get_children(curr)
+                            if children:
+                                if self.goal in children:
+                                    temp_list.append(curr)
+                                    temp_list.append(self.goal)
+                                    #agent3_path.extend(temp_list)
+                                    return temp_list
+                                s_index = self.get_survivability(children, 2*agent2_simulation_number) # Survivability_index 
+                                s_index_max = dict( sorted(s_index.items(), key=operator.itemgetter(1),reverse=True))
+                                
+                                if len(s_index_max):
+                                    next_child = self.get_next_child(s_index_max)
+                                    self.advance_ghosts()
+                                    temp_list = self.agent4(next_child)
+                                    #agent3_path.extend(self.agent3(next_child, destination))
+                                else:
+                                    # Blocked path no child
+                                    if count_advance_ghost!=0:
+                                        self.advance_ghosts() #Agent 3 waits 
+                                        count_advance_ghost-=1
+                                        temp_list = self.agent4(curr)
+                                    else:
+                                        #self.advance_ghosts()
+                                        return []
+                            else:
+                                print("Blocked at ", curr)
+                                self.advance_ghosts()
+                                return []
+                        ###################
+                        curr = node
+                        #input()
+                        return self.heuristic(curr)  
+                    else:
+                        agent3_path.append(node)
+                    self.advance_ghosts()
+
+            else:
+                #BLOCKED
+                self.advance_ghosts() #Agent 4 waits 
+                count +=1
+                if count ==100:
+                    return None
+        if curr in self.ghost_indexes:
+            print("Killed at ", curr)
+        return None
+
+    def heuristic(self, start): # Increased threshold for agent 4
         curr = start
         global agent3_path
         global static_i 
@@ -764,7 +830,143 @@ class Maze:
                         #print("ghosts blocking at ", ghost_blocks)
                         curr = node
                         #input()
-                        return self.agent4(curr) # agent4 replans 
+                        return self.heuristic(curr) # repeated astar replans 
+                    else:
+                        agent3_path.append(node)
+                    self.advance_ghosts()
+
+            else:
+                #BLOCKED
+                try: # Attempts to move away from the nearest ghost 
+                    rows = [1, -1, 0, 0]
+                    cols = [0, 0, 1, -1]
+                    closest_ghost_distance_all_path = float('-infinity')
+                    for i,j in zip(rows, cols):
+                        curr_row = curr.row+i
+                        curr_col = curr.col+j
+                        new_index = Index(curr_row,curr_col)
+                        new_path = self.astar(new_index, self.dist(new_index, self.goal))
+                        if  new_path:
+                            ghost_blocks_in_path = common_member(node_to_path(new_path), self.ghost_indexes.keys())
+                            closest_ghost_distance = float("infinity")
+                            for id, ghost in enumerate(ghost_blocks_in_path):
+                                closest_ghost_distance = min(closest_ghost_distance, self.dist(new_index, ghost))
+                            if closest_ghost_distance >= closest_ghost_distance_all_path:
+                                closest_ghost_distance_all_path = closest_ghost_distance
+                                curr = new_index
+                                path = new_path
+                    #closest_ghost_distance
+                except: # if no solution, it will wait for the ghost to move 
+                    self.advance_ghosts() 
+                    count +=1
+                    if count ==200: # agent 4 can wait a longer time than agent 3
+                        return None
+        if curr in self.ghost_indexes:
+            print("Killed at ", curr)
+        return None
+
+    def agent5(self, source):
+        # this is against agent 2, except the blocked ghosts are not known 
+        curr = source
+        global agent5_path
+        global static_i 
+        count=0
+        while curr!=self.goal and (not (curr in self.ghost_indexes )):
+            path = self.astar(curr, self.dist(curr, self.goal))
+            static_i+=1
+            if path:
+                count=0
+                route = node_to_path(path)
+                for node in route : 
+                    #print(node, self.goal)
+                    if node == self.goal:
+                        return agent5_path
+                    #finding ghost in path 
+                    ghost_blocks = common_member(route, self.ghost_indexes.keys())
+                    #print(ghost_blocks)
+                    #input()
+                    if ghost_blocks: #Ignore the ghost in block and dont replan 
+                        if not (self.ghost_indexes[list(ghost_blocks)[-1]]["replaced_value"] == Components.BLOCK):
+                            print("ghosts blocking at ", ghost_blocks)
+                            curr = node
+                        #input()
+                        return self.agent5(curr) # agent2 replans 
+                    else:
+                        #self.grid[node.row][node.col]="2"
+                        agent5_path.append(node)
+                    self.advance_ghosts()
+            else:
+                #BLOCKED
+                self.advance_ghosts() 
+                count +=1
+                if count ==50:
+                    return None
+        if curr in self.ghost_indexes:
+            print("Killed at ", curr)
+        return None
+
+    def agent5_againt_low_info(self,start):
+        # this is against agent 5, except the blocked ghosts are not known 
+        curr = start
+        global agent3_path
+        global static_i 
+        global count_advance_ghost
+        count=0
+        if curr!=self.goal and (not (curr in self.ghost_indexes )):
+            #path = self.astar(curr, self.manhattan_distance(self.goal))
+            path = self.astar(curr, self.manhattan_distance(self.goal))
+            
+            static_i+=1
+            if path:
+                count=0
+                route = node_to_path(path)
+                for node in route : 
+                    #print(node, self.goal)
+                    if node == self.goal:
+                        return agent3_path
+                    #finding ghost in path 
+                    ghost_blocks = common_member(route, self.ghost_indexes.keys())
+                    if ghost_blocks:
+                        #print("ghosts blocking at ", ghost_blocks)
+                        ###################
+                        if  (self.ghost_indexes[list(ghost_blocks)[-1]]["replaced_value"] == Components.BLOCK):
+                            continue
+                        if curr == self.goal:
+                            temp_list.append(curr)
+                            return temp_list
+                        if curr!=self.goal and (not (curr in self.ghost_indexes )):
+                            children = self.get_children(curr)
+                            if children:
+                                if self.goal in children:
+                                    temp_list.append(curr)
+                                    temp_list.append(self.goal)
+                                    #agent3_path.extend(temp_list)
+                                    return temp_list
+                                s_index = self.get_survivability(children, agent2_simulation_number, "agent2_simulated") # Survivability_index 
+                                s_index_max = dict( sorted(s_index.items(), key=operator.itemgetter(1),reverse=True))
+                                
+                                if len(s_index_max):
+                                    next_child = self.get_next_child(s_index_max)
+                                    self.advance_ghosts()
+                                    temp_list = self.agent3(next_child)
+                                    #agent3_path.extend(self.agent3(next_child, destination))
+                                else:
+                                    # Blocked path no child
+                                    if count_advance_ghost!=0:
+                                        self.advance_ghosts() #Agent 3 waits 
+                                        count_advance_ghost-=1
+                                        temp_list = self.agent3(curr)
+                                    else:
+                                        #self.advance_ghosts()
+                                        return []
+                            else:
+                                print("Blocked at ", curr)
+                                self.advance_ghosts()
+                                return []
+                        ###################
+                        curr = node
+                        #input()
+                        return self.agent2(curr) # agent3 replans # break the barrier 
                     else:
                         agent3_path.append(node)
                     self.advance_ghosts()
@@ -772,24 +974,36 @@ class Maze:
             else:
                 #BLOCKED
                 #print("ELSEeeeeeeeeeeeeeeeeee")
-                self.advance_ghosts() #Agent 4 waits 1000
+                self.advance_ghosts() #Agent 4 waits 
                 count +=1
-                if count ==1000:
+                if count ==100:
                     return None
         if curr in self.ghost_indexes:
             print("Killed at ", curr)
         return None
 
 if __name__ == "__main__":
-    # python3 project1.py 
+    # python3 project1
     switch = {
         "1": "agent1",
         "2": "agent2",
         "3": "agent3",
-        "4": "agent4"
+        "4": "agent4",
+        "5": "agent5",
+        "6": "agent5_2"
     }
+    if len(sys.argv) ==1 :
+        print("---------------------------------------")
+        print("Usage: python3 project1.py 1|2|3|4|5|6")
+        print("\t1 - Agent1")
+        print("\t2 - Agent2")
+        print("\t3 - Agent3")
+        print("\t4 - Agent4")
+        print("\t5 - Agent5")
+        print("---------------------------------------")
+        sys.exit(-1)
     choice = switch[sys.argv[1]]
-    maze = Maze(rows=20, cols=20, probablity_blocked=PROBABLITY_BLOCKED, ghost_count=4)
+    maze = Maze(rows=51, cols=51, probablity_blocked=PROBABLITY_BLOCKED, ghost_count=10)
     # 1. Initiate MAZE 
     maze.initiate()
     FREE_CELLS, BLOCKED_CELLS =  MAZE.learn_structure()
@@ -801,7 +1015,8 @@ if __name__ == "__main__":
     # 3. Display Maze 
     print("MAZE Configurations")
     print("Total cell # is", MAZE.rows* MAZE.cols)
-    MAZE.display("VALID MAZE")    
+    MAZE.display("VALID MAZE")   
+    #input() 
     #input()
     #exit(-1)
     if choice == "agent1":
@@ -832,11 +1047,10 @@ if __name__ == "__main__":
                 MAZE.grid[i.row][i.col] = d[i]
 
         else:
-            MAZE.display("Agent 3 death")
+            MAZE.display("Agent 2 death")
             
     elif choice == "agent3":
-        # Agent 3
-        #path = MAZE.agent3_old(MAZE.start, MAZE.goal, MAZE.start) #working
+        # 6. Agent 3
         path = MAZE.agent3(MAZE.start)
         if path:
             d = {}
@@ -850,11 +1064,7 @@ if __name__ == "__main__":
             MAZE.display("Agent 3 death")
 
     elif choice == "agent4":
-        # Agent 3
-        
-        #path = MAZE.agent3(MAZE.start, MAZE.goal, MAZE.start) #working
-        #path = MAZE.agent3(MAZE.start,MAZE.goal, MAZE.start)
-        #path = MAZE.agent4(MAZE.start)
+        # 7. Agent 3        
         path = MAZE.agent4(MAZE.start)
         if path:
             d = {}
@@ -866,5 +1076,37 @@ if __name__ == "__main__":
                 MAZE.grid[i.row][i.col] = d[i]
         else:
             MAZE.display("Agent 4 death")
+
+    elif choice == "agent5":
+        # 8. Agent2 - Agent 5 
+        print("Agent5 ")
+        path = MAZE.agent5(MAZE.start) #working 
+        if path:
+            d = {}
+            for i in path:
+                d[i]=MAZE.grid[i.row][i.col]
+                MAZE.grid[i.row][i.col] = "5"
+            MAZE.display("AGENT5 - path")
+            for i in d.keys():
+                MAZE.grid[i.row][i.col] = d[i]
+
+        else:
+            MAZE.display("Agent 5 death")
+
+    elif choice == "agent5_2":
+        # 8. Agent2 - Agent 5 
+        print("Agent5 ")
+        path = MAZE.agent5(MAZE.start) #working 
+        if path:
+            d = {}
+            for i in path:
+                d[i]=MAZE.grid[i.row][i.col]
+                MAZE.grid[i.row][i.col] = "6"
+            MAZE.display("AGENT5 - path")
+            for i in d.keys():
+                MAZE.grid[i.row][i.col] = d[i]
+
+        else:
+            MAZE.display("Agent 5 death")
 
     sys.exit()

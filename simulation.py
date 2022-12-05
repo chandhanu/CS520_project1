@@ -18,7 +18,7 @@ def generate_test_values():
     for maze_size in range(51,52):
         total_cells = maze_size*maze_size
         free_cells = int(total_cells*0.25)
-        gc = [i for i in range(0, free_cells)]
+        gc = [i for i in range(0, free_cells, 5)]
         #gc = [i for i in range(1, int((free_cells**(0.5))))]
         blocks_ghost_maze_dict[maze_size] = {"ghost_count":gc}
     return blocks_ghost_maze_dict
@@ -32,7 +32,7 @@ def run_simultation(switch="agent3"):
         values["data"] = {}
         #for gc in [8]:
         for gc in (values["ghost_count"]):
-        #for gc in ([25, 50, 100, 125, 150, 200]):
+        #for gc in ([5,10,15,25,30,35,40,45,50]):
             print("Size:",maze_size,"ghost:",gc)
             success_count = int(0)
             failure_count = 0
@@ -44,8 +44,8 @@ def run_simultation(switch="agent3"):
             values["data"][gc]=data
 
             #logger.info("Total cell # is", maze.rows* maze.cols)
-            for x in range(10):
-                maze = project1_bhuvan.Maze(rows=maze_size, cols=maze_size, probablity_blocked=0.28, ghost_count=gc)
+            for x in range(100):
+                maze = project1.Maze(rows=maze_size, cols=maze_size, probablity_blocked=0.28, ghost_count=gc)
                 # 1. Initiate MAZE 
                 maze.initiate()
                 FREE_CELLS, BLOCKED_CELLS =  maze.learn_structure()
@@ -63,9 +63,10 @@ def run_simultation(switch="agent3"):
                     if path:
                         values["data"][gc]["success_count"]+=1
                         verdict = True
-                    # 4. Agent 2
+                
+                # 4. Agent 2
                 elif switch == "agent2":
-                    path = maze.age2(maze.start)
+                    path = maze.agent2(maze.start)
                     if path:
                         values["data"][gc]["success_count"]+=1
                         verdict = True
@@ -84,8 +85,21 @@ def run_simultation(switch="agent3"):
                     if path:
                         values["data"][gc]["success_count"]+=1
                         verdict = True
+                
+                # 6. Agent 5
+                elif switch == "agent5":
+                    path = maze.agent5(maze.start)
+                    if path:
+                        values["data"][gc]["success_count"]+=1
+                        verdict = True
+                # 6. Agent 5
+                elif switch == "agent5_2":
+                    path = maze.agent5_againt_low_info(maze.start)
+                    if path:
+                        values["data"][gc]["success_count"]+=1
+                        verdict = True
 
-            success_rate = values["data"][gc]["success_count"]/10
+            success_rate = values["data"][gc]["success_count"]/100
             values["data"][gc]["success_rate"] = success_rate
             with open("New2"+switch+".txt", "a") as myfile:
                 myfile.write("\n")
