@@ -1,0 +1,14 @@
+project1.py is the main file 
+---------------------------------------
+Usage: python3 project1.py 1|2|3|4|5|6
+        1 - Agent1
+        2 - Agent2
+        3 - Agent3
+        4 - Agent4
+        5 - Agent5
+---------------------------------------
+
+Project1 is about the CS520 Assignment 1 project "Ghost in Maze" 
+
+Chandhanu, Mohan Kalamani - CM1573
+Sai Chaitanya, Chaganti - SC2482
